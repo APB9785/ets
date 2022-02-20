@@ -1,5 +1,6 @@
 defmodule BagTest do
   use ExUnit.Case
+  import ETS.TestUtils
   alias ETS.Bag
   doctest ETS.Bag
 
@@ -326,6 +327,69 @@ defmodule BagTest do
       table = :ets.new(nil, [:bag])
       bag = Bag.wrap_existing!(table)
       assert table == Bag.get_table!(bag)
+    end
+  end
+
+  describe "Give Away give_away!/3" do
+    test "success" do
+      recipient_pid = self()
+
+      spawn(fn ->
+        bag = Bag.new!()
+        Bag.give_away!(bag, recipient_pid)
+      end)
+
+      assert {:ok, %Bag{}, _pid, []} = Bag.accept()
+    end
+
+    test "cannot give to process which already owns table" do
+      assert_raise RuntimeError,
+                   "ETS.Bag.give_away!/3 returned {:error, :recipient_already_owns_table}",
+                   fn ->
+                     bag = Bag.new!()
+                     Bag.give_away!(bag, self())
+                   end
+    end
+
+    test "cannot give to process which is not alive" do
+      assert_raise RuntimeError,
+                   "ETS.Bag.give_away!/3 returned {:error, :recipient_not_alive}",
+                   fn ->
+                     bag = Bag.new!()
+                     Bag.give_away!(bag, dead_pid())
+                   end
+    end
+
+    test "cannot give a table belonging to another process" do
+      sender_pid = self()
+
+      _owner_pid =
+        spawn_link(fn ->
+          bag = Bag.new!()
+          send(sender_pid, bag)
+          keep_alive()
+        end)
+
+      assert_receive bag
+
+      recipient_pid = spawn_link(fn -> keep_alive() end)
+
+      assert_raise RuntimeError,
+                   "ETS.Bag.give_away!/3 returned {:error, :sender_not_table_owner}",
+                   fn ->
+                     Bag.give_away!(bag, recipient_pid)
+                   end
+    end
+  end
+
+  describe "Acceptor" do
+    test "accept/6 success" do
+      {:ok, recipient_pid} = start_supervised(ETS.TestServer)
+      bag = Bag.new!()
+
+      Bag.give_away!(bag, recipient_pid, "bag")
+
+      assert_receive {:thank_you, %Bag{}}
     end
   end
 

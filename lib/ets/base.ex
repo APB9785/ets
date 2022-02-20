@@ -432,4 +432,34 @@ defmodule ETS.Base do
       end
     end
   end
+
+  @doc false
+  @spec give_away(ETS.table_identifier(), pid(), any(), any()) :: {:ok, any()}
+  def give_away(table, pid, gift, return) do
+    catch_error do
+      catch_sender_not_table_owner table do
+        catch_recipient_not_alive pid do
+          catch_recipient_already_owns_table table, pid do
+            catch_table_not_found table do
+              :ets.give_away(table, pid, gift)
+              {:ok, return}
+            end
+          end
+        end
+      end
+    end
+  end
+
+  @doc false
+  @spec accept(integer() | :infinity) ::
+          {:ok, ETS.table_identifier(), pid(), any()} | {:error, :timeout}
+  def accept(timeout) do
+    receive do
+      {:"ETS-TRANSFER", table, from, gift} ->
+        {:ok, table, from, gift}
+    after
+      timeout ->
+        {:error, :timeout}
+    end
+  end
 end
