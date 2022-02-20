@@ -752,4 +752,48 @@ defmodule ETS.Set do
   """
   @spec wrap_existing!(ETS.table_identifier()) :: Set.t()
   def wrap_existing!(table_identifier), do: unwrap_or_raise(wrap_existing(table_identifier))
+
+  @doc """
+  Transfers ownership of a Set to another process.
+
+  ## Examples
+
+      iex> set = Set.new!()
+      iex> receiver_pid = spawn(fn -> Set.accept() end)
+      iex> Set.give_away(set, receiver_pid)
+      {:ok, set}
+
+      iex> set = Set.new!()
+      iex> dead_pid = ETS.TestUtils.dead_pid()
+      iex> Set.give_away(set, dead_pid)
+      {:error, :recipient_not_alive}
+
+  """
+  @spec give_away(Set.t(), pid(), any()) :: {:ok, Set.t()} | {:error, any()}
+  def give_away(%Set{table: table} = set, pid, gift \\ []),
+    do: Base.give_away(table, pid, gift, set)
+
+  @doc """
+  Same as `give_away/3` but unwraps or raises on error.
+  """
+  @spec give_away!(Set.t(), pid(), any()) :: Set.t()
+  def give_away!(%Set{} = set, pid, gift \\ []),
+    do: unwrap_or_raise(give_away(set, pid, gift))
+
+  @doc """
+  Waits to accept ownership of a table after it is given away.  Successful receipt will
+  return `{:ok, set, from, gift}` where `from` is the pid of the previous owner, and
+  `gift` is any additional metadata sent with the table.
+
+  A timeout may be given in milliseconds, which will return `{:error, :timeout}` if reached.
+
+  See `give_away/3` for more information.
+  """
+  @spec accept() :: {:ok, Set.t(), pid(), any()} | {:error, any()}
+  def accept(timeout \\ :infinity) do
+    with {:ok, table, from, gift} <- Base.accept(timeout),
+         {:ok, set} <- Set.wrap_existing(table) do
+      {:ok, set, from, gift}
+    end
+  end
 end
