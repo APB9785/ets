@@ -1,5 +1,6 @@
 defmodule KeyValueSetTest do
   use ExUnit.Case
+  import ETS.TestUtils
   alias ETS.KeyValueSet
   alias ETS.Set
   alias ETS.TestUtils

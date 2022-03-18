@@ -1,5 +1,6 @@
 defmodule SetTest do
   use ExUnit.Case
+  import ETS.TestUtils
   alias ETS.Set
   alias ETS.TestUtils
   doctest ETS.Set
@@ -440,6 +441,47 @@ defmodule SetTest do
                    "ETS.Set.match!/1 returned {:error, :invalid_continuation}",
                    fn ->
                      Set.match!(:not_a_continuation)
+                   end
+    end
+
+    test "match_delete!/2 raises on error" do
+      set = Set.new!()
+      Set.delete(set)
+
+      assert_raise RuntimeError,
+                   "ETS.Set.match_delete!/2 returned {:error, :table_not_found}",
+                   fn ->
+                     Set.match_delete!(set, {:a})
+                   end
+    end
+
+    test "match_object!/2 raises on error" do
+      set = Set.new!()
+      Set.delete(set)
+
+      assert_raise RuntimeError,
+                   "ETS.Set.match_object!/2 returned {:error, :table_not_found}",
+                   fn ->
+                     Set.match_object!(set, {:a})
+                   end
+    end
+
+    test "match_object!/3 raises on error" do
+      set = Set.new!()
+      Set.delete(set)
+
+      assert_raise RuntimeError,
+                   "ETS.Set.match_object!/3 returned {:error, :table_not_found}",
+                   fn ->
+                     Set.match_object!(set, {:a}, 1)
+                   end
+    end
+
+    test "match_object!/1 raises on error" do
+      assert_raise RuntimeError,
+                   "ETS.Set.match_object!/1 returned {:error, :invalid_continuation}",
+                   fn ->
+                     Set.match_object!(:not_a_continuation)
                    end
     end
   end
