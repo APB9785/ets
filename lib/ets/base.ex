@@ -495,7 +495,7 @@ defmodule ETS.Base do
   end
 
   @doc false
-  @spec give_away(ETS.table_identifier(), pid(), any(), any()) :: {:ok, any()}
+  @spec give_away(ETS.table_identifier(), pid(), any(), any()) :: {:ok, any()} | {:error, any()}
   def give_away(table, pid, gift, return) do
     catch_error do
       catch_sender_not_table_owner table do
@@ -521,6 +521,18 @@ defmodule ETS.Base do
     after
       timeout ->
         {:error, :timeout}
+    end
+  end
+
+  defmacro accept(id, table, from, state, do: contents) do
+    quote do
+      def handle_info(
+            {:"ETS-TRANSFER", unquote(table), unquote(from), unquote(id)},
+            unquote(state)
+          ) do
+        var!(unquote(table)) = unquote(table)
+        unquote(contents)
+      end
     end
   end
 end

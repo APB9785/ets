@@ -887,8 +887,8 @@ defmodule ETS.Set do
 
   @doc """
   Waits to accept ownership of a table after it is given away.  Successful receipt will
-  return `{:ok, set, from, gift}` where `from` is the pid of the previous owner, and
-  `gift` is any additional metadata sent with the table.
+  return `{:ok, %{set: set, from: from, gift: gift}}` where `from` is the pid of the previous
+  owner, and `gift` is any additional metadata sent with the table.
 
   A timeout may be given in milliseconds, which will return `{:error, :timeout}` if reached.
 
@@ -898,7 +898,45 @@ defmodule ETS.Set do
   def accept(timeout \\ :infinity) do
     with {:ok, table, from, gift} <- Base.accept(timeout),
          {:ok, set} <- Set.wrap_existing(table) do
-      {:ok, set, from, gift}
+      {:ok, %{set: set, from: from, gift: gift}}
+    end
+  end
+
+  @doc """
+  For processes which may receive ownership of a Set unexpectedly - either via `give_away/3` or
+  by being named the Set's heir (see `new/1`) - the module should include at least one `accept`
+  clause.  For example, if we want a server to inherit Sets after their previous owner dies:
+
+  ```
+  defmodule Receiver do
+    use GenServer
+    alias ETS.Set
+    require ETS.Set
+
+    ...
+
+    Set.accept :owner_crashed, set, _from, state do
+      new_state = Map.update!(state, :crashed_sets, &[set | &1])
+      {:noreply, new_state}
+    end
+  ```
+
+  The first argument is a unique identifier which should match either the "heir_data"
+  in `new/1`, or the "gift" in `give_away/3`.
+  The other arguments declare the variables which may be used in the `do` block:
+  the received Set, the pid of the previous owner, and the current state of the process.
+
+  The return value should be in the form {:noreply, new_state}, or one of the similar
+  returns expected by `handle_info`/`handle_cast`.
+  """
+  defmacro accept(id, table, from, state, do: contents) do
+    quote do
+      require Base
+
+      Base.accept unquote(id), unquote(table), unquote(from), unquote(state) do
+        var!(unquote(table)) = Set.wrap_existing!(unquote(table))
+        unquote(contents)
+      end
     end
   end
 end

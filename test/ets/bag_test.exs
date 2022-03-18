@@ -2,6 +2,7 @@ defmodule BagTest do
   use ExUnit.Case
   import ETS.TestUtils
   alias ETS.Bag
+  alias ETS.TestUtils
   doctest ETS.Bag
 
   describe "Named Tables Start" do
@@ -380,7 +381,7 @@ defmodule BagTest do
         Bag.give_away!(bag, recipient_pid)
       end)
 
-      assert {:ok, %Bag{}, _pid, []} = Bag.accept()
+      assert {:ok, %{bag: %Bag{}, gift: []}} = Bag.accept()
     end
 
     test "cannot give to process which already owns table" do
@@ -397,7 +398,7 @@ defmodule BagTest do
                    "ETS.Bag.give_away!/3 returned {:error, :recipient_not_alive}",
                    fn ->
                      bag = Bag.new!()
-                     Bag.give_away!(bag, dead_pid())
+                     Bag.give_away!(bag, TestUtils.dead_pid())
                    end
     end
 
@@ -408,12 +409,12 @@ defmodule BagTest do
         spawn_link(fn ->
           bag = Bag.new!()
           send(sender_pid, bag)
-          keep_alive()
+          Process.sleep(:infinity)
         end)
 
       assert_receive bag
 
-      recipient_pid = spawn_link(fn -> keep_alive() end)
+      recipient_pid = spawn_link(fn -> Process.sleep(:infinity) end)
 
       assert_raise RuntimeError,
                    "ETS.Bag.give_away!/3 returned {:error, :sender_not_table_owner}",
@@ -423,14 +424,16 @@ defmodule BagTest do
     end
   end
 
-  describe "Acceptor" do
-    test "accept/6 success" do
+  describe "Macro" do
+    test "accept/5 success" do
       {:ok, recipient_pid} = start_supervised(ETS.TestServer)
-      bag = Bag.new!()
 
-      Bag.give_away!(bag, recipient_pid, "bag")
+      %Bag{table: table} = bag = Bag.new!()
 
-      assert_receive {:thank_you, %Bag{}}
+      Bag.give_away!(bag, recipient_pid, :bag_test)
+
+      assert_receive {:thank_you, %Bag{table: ^table}}
+      assert_receive :state_saved_ok
     end
   end
 

@@ -2,6 +2,7 @@ defmodule SetTest do
   use ExUnit.Case
   import ETS.TestUtils
   alias ETS.Set
+  alias ETS.TestUtils
   doctest ETS.Set
 
   describe "New" do
@@ -654,7 +655,7 @@ defmodule SetTest do
         Set.give_away!(set, recipient_pid)
       end)
 
-      assert {:ok, %Set{}, _pid, []} = Set.accept()
+      assert {:ok, %{set: %Set{}, gift: []}} = Set.accept()
     end
 
     test "cannot give to process which already owns table" do
@@ -671,7 +672,7 @@ defmodule SetTest do
                    "ETS.Set.give_away!/3 returned {:error, :recipient_not_alive}",
                    fn ->
                      set = Set.new!()
-                     Set.give_away!(set, dead_pid())
+                     Set.give_away!(set, TestUtils.dead_pid())
                    end
     end
 
@@ -682,12 +683,12 @@ defmodule SetTest do
         spawn_link(fn ->
           set = Set.new!()
           send(sender_pid, set)
-          keep_alive()
+          Process.sleep(:infinity)
         end)
 
       assert_receive set
 
-      recipient_pid = spawn_link(fn -> keep_alive() end)
+      recipient_pid = spawn_link(fn -> Process.sleep(:infinity) end)
 
       assert_raise RuntimeError,
                    "ETS.Set.give_away!/3 returned {:error, :sender_not_table_owner}",
@@ -697,14 +698,16 @@ defmodule SetTest do
     end
   end
 
-  describe "Acceptor" do
-    test "accept/6 success" do
+  describe "Macro" do
+    test "accept/5 success" do
       {:ok, recipient_pid} = start_supervised(ETS.TestServer)
-      set = Set.new!()
 
-      Set.give_away!(set, recipient_pid, "set")
+      %Set{table: table} = set = Set.new!()
 
-      assert_receive {:thank_you, %Set{}}
+      Set.give_away!(set, recipient_pid, :set_test)
+
+      assert_receive {:thank_you, %Set{table: ^table}}
+      assert_receive :state_saved_ok
     end
   end
 

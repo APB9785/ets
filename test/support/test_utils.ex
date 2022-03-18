@@ -18,9 +18,4 @@ defmodule ETS.TestUtils do
       pid
     end
   end
-
-  @doc """
-  A function which will never complete.
-  """
-  def keep_alive, do: keep_alive()
 end

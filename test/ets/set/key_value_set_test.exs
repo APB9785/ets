@@ -3,6 +3,7 @@ defmodule KeyValueSetTest do
   import ETS.TestUtils
   alias ETS.KeyValueSet
   alias ETS.Set
+  alias ETS.TestUtils
   doctest ETS.KeyValueSet
 
   describe "New" do
@@ -432,7 +433,7 @@ defmodule KeyValueSetTest do
         KeyValueSet.give_away!(bag, recipient_pid)
       end)
 
-      assert {:ok, %KeyValueSet{}, _pid, []} = KeyValueSet.accept()
+      assert {:ok, %{kv_set: %KeyValueSet{}, gift: []}} = KeyValueSet.accept()
     end
 
     test "cannot give to process which already owns table" do
@@ -449,7 +450,7 @@ defmodule KeyValueSetTest do
                    "ETS.KeyValueSet.give_away!/3 returned {:error, :recipient_not_alive}",
                    fn ->
                      kv_set = KeyValueSet.new!()
-                     KeyValueSet.give_away!(kv_set, dead_pid())
+                     KeyValueSet.give_away!(kv_set, TestUtils.dead_pid())
                    end
     end
 
@@ -460,12 +461,12 @@ defmodule KeyValueSetTest do
         spawn_link(fn ->
           kv_set = KeyValueSet.new!()
           send(sender_pid, kv_set)
-          keep_alive()
+          Process.sleep(:infinity)
         end)
 
       assert_receive kv_set
 
-      recipient_pid = spawn_link(fn -> keep_alive() end)
+      recipient_pid = spawn_link(fn -> Process.sleep(:infinity) end)
 
       assert_raise RuntimeError,
                    "ETS.KeyValueSet.give_away!/3 returned {:error, :sender_not_table_owner}",
@@ -475,14 +476,16 @@ defmodule KeyValueSetTest do
     end
   end
 
-  describe "Acceptor" do
-    test "accept/6 success" do
+  describe "Macro" do
+    test "accept/5 success" do
       {:ok, recipient_pid} = start_supervised(ETS.TestServer)
-      kv_set = KeyValueSet.new!()
 
-      KeyValueSet.give_away!(kv_set, recipient_pid, "kv_set")
+      %KeyValueSet{set: %Set{table: table}} = kv_set = KeyValueSet.new!()
 
-      assert_receive {:thank_you, %KeyValueSet{}}
+      KeyValueSet.give_away!(kv_set, recipient_pid, :kv_test)
+
+      assert_receive {:thank_you, %KeyValueSet{set: %Set{table: ^table}}}
+      assert_receive :state_saved_ok
     end
   end
 
